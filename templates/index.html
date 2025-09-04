@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Home - Sentiment & Clock Demos</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<style>
+body {
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    height:100vh;
+    font-family:system-ui;
+}
+button {
+    padding:20px 40px;
+    margin:20px;
+    font-size:20px;
+    cursor:pointer;
+    border-radius:8px;
+    border:none;
+    background:#3498db;
+    color:white;
+}
+button:hover { background:#2980b9; }
+</style>
+</head>
+<body>
+<h1>Welcome! Choose a Demo</h1>
+<button onclick="location.href='/sentiment'">Sentiment Analyzer</button>
+<button onclick="location.href='/clock'">Circular Clock</button>
+</body>
+</html>

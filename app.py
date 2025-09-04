@@ -28,24 +28,7 @@ history_negative = []
 # -------------------
 @app.route('/')
 def index():
-    return """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Choose Tool</title>
-        <style>
-            body { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; font-family:system-ui; }
-            button { padding:20px 40px; margin:20px; font-size:20px; cursor:pointer; border-radius:8px; border:none; background:#3498db; color:white; }
-            button:hover { background:#2980b9; }
-        </style>
-    </head>
-    <body>
-        <h1>Select a Tool</h1>
-        <button onclick="location.href='/sentiment'">Sentiment Analyzer</button>
-        <button onclick="location.href='/clock'">Circular Clock</button>
-    </body>
-    </html>
-    """
+    return render_template('index.html')  # now using index.html from templates/
 
 # -------------------
 # Sentiment Analyzer route
@@ -109,4 +92,6 @@ def analyze():
 # Run the app
 # -------------------
 if __name__ == '__main__':
-    app.run(debug=True)
+    import os
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=True)
