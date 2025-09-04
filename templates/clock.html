@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Interactive Clock with Circular Mean, Median, and Density</title>
+<style>
+body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+  background: #f4f4f4;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+h1 {
+  margin-bottom: 10px;
+  text-align: center;
+}
+.instructions {
+  max-width: 500px;
+  text-align: center;
+  margin-bottom: 20px;
+  font-size: 16px;
+  line-height: 1.4;
+  background: #fff;
+  padding: 15px;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+svg {
+  cursor: crosshair;
+  margin-bottom: 16px;
+  user-select: none;
+  background: white;
+  border-radius: 50%;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+button, input {
+  margin: 5px;
+  padding: 8px 12px;
+  font-size: 14px;
+  border: none;
+  border-radius: 6px;
+  background: #3498db;
+  color: white;
+  cursor: pointer;
+}
+button:hover { background: #2980b9; }
+#reset { background: #e74c3c; }
+#reset:hover { background: #c0392b; }
+#timesList {
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: #fff;
+  max-height: 220px;
+  overflow-y: auto;
+  display: none;
+  width: 380px;
+  box-sizing: border-box;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+}
+.controls input[type="number"] {
+  width: 110px;
+  color: #222;
+  background: white;
+  border: 1px solid #ccc;
+}
+.formulas {
+  max-width: 600px;
+  margin-top: 20px;
+  padding: 15px;
+  font-size: 15px;
+  line-height: 1.5;
+  background: #fff;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+.formulas h2 {
+  font-size: 18px;
+  margin-bottom: 6px;
+  color: #333;
+}
+.formulas code, .formulas span {
+  font-family: "Cambria Math", "STIXGeneral", serif;
+}
+
+/* Back button styling */
+.back-btn {
+  background:#7f8c8d;
+  color:white;
+  border:none;
+  border-radius:6px;
+  padding:8px 12px;
+  cursor:pointer;
+  margin:10px;
+}
+.back-btn:hover { background:#95a5a6; }
+</style>
+</head>
+<body>
+
+<h1>Interactive Clock: Pick Times & See Circular Statistics</h1>
+<button class="back-btn" onclick="location.href='/'">Back to Home</button>
+
+<div class="instructions">
+Click inside the clock to select a time (down to the minute).<br>
+Enter a number and click "Plot Random" to generate random times.<br>
+<span style="color:red;">Red arrow:</span> circular mean, 
+<span style="color:blue;">Blue arrow:</span> circular median, 
+<span style="color:green;">Green area:</span> density of selected times.<br>
+Use "Show Times" to view all times and "Reset" to clear.
+</div>
+
+<!-- Main Clock -->
+<svg id="clock" width="420" height="420" viewBox="0 0 420 420" aria-label="Interactive clock">
+  <g id="face">
+    <circle cx="210" cy="210" r="190" fill="white" stroke="black" stroke-width="3"/>
+    <g id="ticks" stroke="#999" stroke-width="1"></g>
+  </g>
+  <g id="labels" style="pointer-events:none;" font-size="22" text-anchor="middle" fill="#222"></g>
+  <circle cx="210" cy="210" r="4" fill="black"/>
+  <g id="hands"></g>
+</svg>
+
+<div class="controls">
+  <button id="toggleList">Show Times</button>
+  <button id="reset">Reset</button>
+  <input type="number" id="randomCount" placeholder="e.g. 100" min="1" />
+  <button id="randomBtn">Plot Random</button>
+</div>
+<div id="timesList"></div>
+
+<!-- Density Clock -->
+<svg id="density" width="420" height="420" viewBox="0 0 420 420" aria-label="Circular density">
+  <circle cx="210" cy="210" r="190" fill="white" stroke="black" stroke-width="3"/>
+  <g id="densityWedges" transform="translate(210,210)"></g>
+</svg>
+
+<!-- Formula Box -->
+<div class="formulas">
+  <h2>Circular Mean</h2>
+  <p>
+    <span>C = (1/n) Σ cos(θᵢ),&nbsp; S = (1/n) Σ sin(θᵢ)</span><br>
+    <span>θ̄ = atan2(S, C)</span>
+  </p>
+  <h2>Circular Median</h2>
+  <p>
+    <span>θ̃ = arg&nbsp;min<sub>ψ</sub> (1/n) Σ d(θᵢ, ψ)</span><br>
+    <small>where d(θᵢ, ψ) is the circular distance between angles.</small>
+  </p>
+</div>
+
+<script>
+const svg = document.getElementById('clock');
+const labelsGroup = document.getElementById('labels');
+const handsGroup = document.getElementById('hands');
+const resetBtn = document.getElementById('reset');
+const toggleListBtn = document.getElementById('toggleList');
+const randomBtn = document.getElementById('randomBtn');
+const randomInput = document.getElementById('randomCount');
+const timesListDiv = document.getElementById('timesList');
+const densityGroup = document.getElementById('densityWedges');
+
+const cx = 210, cy = 210, r = 180;
+let timesPicked = [];
+let meanArrow = null, meanTextNode = null;
+let medianArrow = null, medianTextNode = null;
+const EPS = 1e-10;
+
+// --- Draw hour numbers ---
+(function drawNumbers() {
+  for (let i = 1; i <= 12; i++) {
+    const angle = (i / 12) * 2 * Math.PI - Math.PI / 2;
+    const tx = cx + Math.cos(angle) * (r - 28);
+    const ty = cy + Math.sin(angle) * (r - 28);
+    const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    t.setAttribute('x', tx);
+    t.setAttribute('y', ty + 7);
+    t.textContent = i;
+    labelsGroup.appendChild(t);
+  }
+})();
+
+// --- Draw tick marks ---
+(function drawTicks() {
+  const ticksGroup = svg.querySelector('#ticks');
+  for (let i = 0; i < 60; i++) {
+    const a = (i / 60) * 2 * Math.PI - Math.PI / 2;
+    const isHour = i % 5 === 0;
+    const r1 = r - (isHour ? 14 : 6);
+    const x1 = cx + Math.cos(a) * r1;
+    const y1 = cy + Math.sin(a) * r1;
+    const x2 = cx + Math.cos(a) * r;
+    const y2 = cy + Math.sin(a) * r;
+    const l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    l.setAttribute('x1', x1);
+    l.setAttribute('y1', y1);
+    l.setAttribute('x2', x2);
+    l.setAttribute('y2', y2);
+    l.setAttribute('stroke-width', isHour ? 2 : 1);
+    ticksGroup.appendChild(l);
+  }
+})();
+
+// --- SVG helpers ---
+function toSvgCoords(evt) {
+  const pt = svg.createSVGPoint();
+  pt.x = evt.clientX; pt.y = evt.clientY;
+  return pt.matrixTransform(svg.getScreenCTM().inverse());
+}
+
+function drawLineAtAngle(theta) {
+  const x2 = cx + Math.cos(theta) * r;
+  const y2 = cy + Math.sin(theta) * r;
+  const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  line.setAttribute('x1', cx);
+  line.setAttribute('y1', cy);
+  line.setAttribute('x2', x2);
+  line.setAttribute('y2', y2);
+  line.setAttribute('stroke', 'red');
+  line.setAttribute('stroke-width', '1');
+  handsGroup.appendChild(line);
+}
+
+function angleToTime(theta) {
+  let fromTopCCW = (theta + Math.PI/2) % (2*Math.PI);
+  if (fromTopCCW < 0) fromTopCCW += 2*Math.PI;
+  const totalMinutes = Math.round((fromTopCCW / (2*Math.PI)) * 720) % 720;
+  const hRaw = Math.floor(totalMinutes / 60);
+  const h = (hRaw % 12) === 0 ? 12 : (hRaw % 12);
+  const m = totalMinutes % 60;
+  return { h, m };
+}
+
+// --- Update times list ---
+function updateTimesList() {
+  if (timesPicked.length === 0) {
+    timesListDiv.innerHTML = "<b>Times picked:</b><br><i>None yet.</i>";
+  } else {
+    timesListDiv.innerHTML = "<b>Times picked:</b><br>" + timesPicked.join(", ");
+  }
+}
+
+// --- Draw circular density ---
+function drawCircularDensity() {
+  while (densityGroup.firstChild) densityGroup.removeChild(densityGroup.firstChild);
+  if (timesPicked.length === 0) return;
+
+  const decimalHours = timesPicked.map(t => {
+    const [h, m] = t.split(':').map(Number);
+    return h % 12 + m / 60;
+  });
+  const angles = decimalHours.map(h => (h / 12) * 2 * Math.PI);
+
+  const numPoints = 360;
+  const kappa = 4;
+
+  function densityAt(theta) {
+    let sum = 0;
+    angles.forEach(mu => sum += Math.exp(kappa * Math.cos(theta - mu)));
+    return sum / angles.length;
+  }
+
+  let maxD = 0;
+  const densities = [];
+  for (let i = 0; i < numPoints; i++) {
+    const theta = (i / numPoints) * 2 * Math.PI;
+    const d = densityAt(theta);
+    densities.push(d);
+    if (d > maxD) maxD = d;
+  }
+
+  const innerR = 50;
+  const outerR = r;
+  let pathD = "";
+  for (let i = 0; i < numPoints; i++) {
+    const theta = (i / numPoints) * 2 * Math.PI - Math.PI/2;
+    const len = innerR + (densities[i]/maxD)*(outerR-innerR);
+    const x = Math.cos(theta) * len;
+    const y = Math.sin(theta) * len;
+    pathD += (i===0?"M":"L") + x + " " + y + " ";
+  }
+  pathD += "Z";
+
+  const path = document.createElementNS("http://www.w3.org/2000/svg","path");
+  path.setAttribute("d", pathD);
+  path.setAttribute("fill", "rgba(0,150,0,0.3)");
+  path.setAttribute("stroke", "green");
+  path.setAttribute("stroke-width", 2);
+  densityGroup.appendChild(path);
+}
+
+// --- Click event ---
+svg.addEventListener('click', evt => {
+  const { x, y } = toSvgCoords(evt);
+  const dx = x - cx, dy = y - cy;
+  const dist = Math.hypot(dx, dy);
+  if (dist < 4 || dist > r + 20) return;
+
+  const theta = Math.atan2(dy, dx);
+  drawLineAtAngle(theta);
+  const { h, m } = angleToTime(theta);
+  timesPicked.push(`${h}:${m.toString().padStart(2,'0')}`);
+  updateTimesList();
+  drawMeanArrow();
+  drawCircularMedian();
+  drawCircularDensity();
+});
+
+// --- Reset ---
+resetBtn.addEventListener('click', () => {
+  while (handsGroup.firstChild) handsGroup.removeChild(handsGroup.firstChild);
+  while (densityGroup.firstChild) densityGroup.removeChild(densityGroup.firstChild);
+  timesPicked = [];
+  updateTimesList();
+  drawMeanArrow();
+  drawCircularMedian();
+});
+
+// --- Toggle list ---
+toggleListBtn.addEventListener('click', () => {
+  const hidden = timesListDiv.style.display === 'none' || timesListDiv.style.display === '';
+  timesListDiv.style.display = hidden ? 'block' : 'none';
+  toggleListBtn.textContent = hidden ? 'Hide Times' : 'Show Times';
+});
+
+// --- Plot random times ---
+randomBtn.addEventListener('click', () => {
+  const count = parseInt(randomInput.value, 10);
+  if (isNaN(count) || count <= 0) return;
+  for (let i = 0; i < count; i++) {
+    const totalMinutes = Math.floor(Math.random()*720);
+    const theta = (totalMinutes / 720) * 2 * Math.PI - Math.PI / 2;
+    drawLineAtAngle(theta);
+    const hRaw = Math.floor(totalMinutes / 60);
+    const h = (hRaw % 12) === 0 ? 12 : (hRaw % 12);
+    const m = totalMinutes % 60;
+    timesPicked.push(`${h}:${m.toString().padStart(2,'0')}`);
+  }
+  updateTimesList();
+  drawMeanArrow();
+  drawCircularMedian();
+  drawCircularDensity();
+});
+
+// --- Arrowhead definitions ---
+const defs = document.createElementNS("http://www.w3.org/2000/svg","defs");
+defs.innerHTML = `
+<marker id="arrowheadRed" markerWidth="10" markerHeight="7" refX="0" refY="3.5"
+orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="red"/></marker>
+<marker id="arrowheadBlue" markerWidth="10" markerHeight="7" refX="0" refY="3.5"
+orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="blue"/></marker>`;
+svg.prepend(defs);
+
+// --- Circular mean & median functions ---
+function drawMeanArrow() {
+  if (meanArrow) meanArrow.remove();
+  if (meanTextNode) meanTextNode.remove();
+  if (timesPicked.length === 0) return;
+
+  const decimalHours = timesPicked.map(t => {
+    const [h,m] = t.split(':').map(Number);
+    return h % 12 + m/60;
+  });
+  const angles = decimalHours.map(h => (h/12)*2*Math.PI);
+
+  let C=0, S=0;
+  angles.forEach(theta => { C += Math.cos(theta); S += Math.sin(theta); });
+  C /= angles.length; S /= angles.length;
+
+  if (Math.abs(C) < EPS && Math.abs(S) < EPS) return;
+
+  let thetaMean = Math.atan2(S, C);
+
+  const x2 = cx + Math.cos(thetaMean - Math.PI/2)*(r+10);
+  const y2 = cy + Math.sin(thetaMean - Math.PI/2)*(r+10);
+
+  meanArrow = document.createElementNS('http://www.w3.org/2000/svg','line');
+  meanArrow.setAttribute('x1',cx); meanArrow.setAttribute('y1',cy);
+  meanArrow.setAttribute('x2',x2); meanArrow.setAttribute('y2',y2);
+  meanArrow.setAttribute('stroke','red'); meanArrow.setAttribute('stroke-width','3');
+  meanArrow.setAttribute('marker-end','url(#arrowheadRed)');
+  handsGroup.appendChild(meanArrow);
+
+  meanTextNode = document.createElementNS('http://www.w3.org/2000/svg','text');
+  meanTextNode.setAttribute('x', x2+10);
+  meanTextNode.setAttribute('y', y2-10);
+  meanTextNode.setAttribute('fill','red');
+  meanTextNode.setAttribute('font-size','14');
+  meanTextNode.textContent = 'Mean';
+  handsGroup.appendChild(meanTextNode);
+}
+
+function drawCircularMedian() {
+  if (medianArrow) medianArrow.remove();
+  if (medianTextNode) medianTextNode.remove();
+  if (timesPicked.length === 0) return;
+
+  const decimalHours = timesPicked.map(t => {
+    const [h,m] = t.split(':').map(Number);
+    return h % 12 + m/60;
+  });
+  const angles = decimalHours.map(h => (h/12)*2*Math.PI);
+
+  const gridPoints = 1000;
+  let minDeviation = Infinity;
+  let medianAngle = 0;
+
+  for (let i = 0; i < gridPoints; i++) {
+    const psi = (i/gridPoints)*2*Math.PI;
+    let d2 = 0;
+    angles.forEach(theta => {
+      const diff = Math.abs(theta-psi) % (2*Math.PI);
+      const dev = Math.PI - Math.abs(Math.PI - diff);
+      d2 += dev;
+    });
+    d2 /= angles.length;
+    if (d2 < minDeviation) { minDeviation=d2; medianAngle=psi; }
+  }
+
+  const x2 = cx + Math.cos(medianAngle - Math.PI/2)*(r+10);
+  const y2 = cy + Math.sin(medianAngle - Math.PI/2)*(r+10);
+
+  medianArrow = document.createElementNS('http://www.w3.org/2000/svg','line');
+  medianArrow.setAttribute('x1',cx); medianArrow.setAttribute('y1',cy);
+  medianArrow.setAttribute('x2',x2); medianArrow.setAttribute('y2',y2);
+  medianArrow.setAttribute('stroke','blue'); medianArrow.setAttribute('stroke-width','3');
+  medianArrow.setAttribute('marker-end','url(#arrowheadBlue)');
+  handsGroup.appendChild(medianArrow);
+
+  medianTextNode = document.createElementNS('http://www.w3.org/2000/svg','text');
+  medianTextNode.setAttribute('x', x2+10);
+  medianTextNode.setAttribute('y', y2-10);
+  medianTextNode.setAttribute('fill','blue');
+  medianTextNode.setAttribute('font-size','14');
+  medianTextNode.textContent = 'Median';
+  handsGroup.appendChild(medianTextNode);
+}
+</script>
+</body>
+</html>
