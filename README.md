@@ -50,6 +50,7 @@ pip install -r requirements.txt
 ```bash
 python app.py
 
+```text
 Once running, visit the local webpage shown in your terminal (usually:
 http://127.0.0.1:5000)
 
