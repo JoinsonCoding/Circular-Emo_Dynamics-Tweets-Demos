@@ -41,16 +41,18 @@ These demos can be run from a command line terminal:
 ```bash
 git clone https://github.com/yourusername/sentiment_app.git
 cd sentiment_app
+```
 
 **### 2. Install dependencies**
 ```bash
 pip install -r requirements.txt
+```
 
 **### 3. Run the app**
 ```bash
 python app.py
+```
 
-```text
 Once running, visit the local webpage shown in your terminal (usually:
 http://127.0.0.1:5000)
 
