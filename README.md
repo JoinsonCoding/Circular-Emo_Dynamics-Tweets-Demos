@@ -39,8 +39,8 @@ These demos can be run from a command line terminal:
 
 ### 1. Clone the repository
 ```bash
-git clone https://github.com/yourusername/sentiment_app.git
-cd sentiment_app
+git clone https://github.com/JoinsonCoding/Circular-Emo_Dynamics-Tweets-Demos.git
+cd Circular-Emo_Dynamics-Tweets-Demos
 ```
 
 **### 2. Install dependencies**
